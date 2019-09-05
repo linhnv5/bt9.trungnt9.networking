@@ -107,6 +107,9 @@ public class Session implements ISession {
 						// send message
 						dos.writeInt(data.length); // send length
 						dos.write(data, 0, data.length); // send data
+
+						// flush data to send message to client
+						dos.flush();
 					}
 				}
 			} catch(Exception e) {

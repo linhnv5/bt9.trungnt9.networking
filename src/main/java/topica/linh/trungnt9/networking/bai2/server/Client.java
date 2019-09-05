@@ -86,7 +86,7 @@ final class Client extends Session implements IMessageHander {
 					// format error, send na result code and close handle
 					mss = new Message(Message.CMD_ERROR);
 					mss.addTag(new Tag(Tag.TAG_RESULT_CODE, "NA"));
-					super.sendMessage(mss);
+					this.sendMessage(mss);
 					return;
 				}
 				// get phone number
@@ -105,7 +105,7 @@ final class Client extends Session implements IMessageHander {
 						&& t.getValue().equals(KEY_AUTHEN)) {
 							// if tag is tag key and key is topica then return ok result and change state to init
 							this.state = State.READY;
-							super.sendMessage(this.getResponseMessage(Message.CMD_AUTHEN, phoneNumber, true));
+							this.sendMessage(this.getResponseMessage(Message.CMD_AUTHEN, phoneNumber, true));
 							return;
 					}
 					break; // break to send nok result
@@ -117,7 +117,7 @@ final class Client extends Session implements IMessageHander {
 						// if commit then change state to select and return ok
 						if (mss.getCmd() == Message.CMD_COMMIT) {
 							this.state = State.SELECT;
-							super.sendMessage(this.getResponseMessage(Message.CMD_COMMIT, phoneNumber, true));
+							this.sendMessage(this.getResponseMessage(Message.CMD_COMMIT, phoneNumber, true));
 							return;
 						}
 						// else it is insert
@@ -125,7 +125,7 @@ final class Client extends Session implements IMessageHander {
 						if ((t = mss.getTag(Tag.TAG_NAME)) != null) {
 							// insert user to server and return ok result code
 							Server.gI().addUser(phoneNumber, t.getValue());
-							super.sendMessage(this.getResponseMessage(Message.CMD_INSERT, phoneNumber, true));
+							this.sendMessage(this.getResponseMessage(Message.CMD_INSERT, phoneNumber, true));
 							return;
 						}
 					}
@@ -140,7 +140,7 @@ final class Client extends Session implements IMessageHander {
 							// return ok result code and name slected
 							mss = this.getResponseMessage(Message.CMD_AUTHEN, phoneNumber, true);
 							mss.addTag(new Tag(Tag.TAG_NAME, user));
-							super.sendMessage(mss);
+							this.sendMessage(mss);
 							return;
 						}
 					}
@@ -151,7 +151,7 @@ final class Client extends Session implements IMessageHander {
 		}
 
 		// if command did not handle then return nok result
-		super.sendMessage(this.getResponseMessage(mss.getCmd(), phoneNumber, false));
+		this.sendMessage(this.getResponseMessage(mss.getCmd(), phoneNumber, false));
 	}
 
 	@Override

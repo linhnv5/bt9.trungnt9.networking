@@ -202,6 +202,9 @@ public final class Message {
 				ds.writeShort(t.tag);
 				ds.writeUTF(t.value == null ? "null" : t.value);
 			}
+
+			// flush stream
+			ds.flush();
 		} catch(IOException e) {
 		} finally {
 			try {
