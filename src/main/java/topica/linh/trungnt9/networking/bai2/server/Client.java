@@ -54,6 +54,8 @@ final class Client extends Session implements IMessageHander {
 	 * resultcode = false then resultvalue is 'NOK'<br/>
 	 * resultcode = true then resultvalue is 'OK'<br/>
 	 * 
+	 * phoneNumber = null will not send phonenumber tag to client
+	 * 
 	 * @param cmd          Command code
 	 * @param phoneNumber  Phone number received
 	 * @param resultCode   ResultCode
@@ -61,7 +63,8 @@ final class Client extends Session implements IMessageHander {
 	 */
 	private Message getResponseMessage(int cmd, String phoneNumber, boolean resultCode) {
 		Message mss = new Message(cmd);
-		mss.addTag(new Tag(Tag.TAG_PHONE_NUMBER, phoneNumber));
+		if(phoneNumber != null)
+			mss.addTag(new Tag(Tag.TAG_PHONE_NUMBER, phoneNumber));
 		mss.addTag(new Tag(Tag.TAG_RESULT_CODE, resultCode ? "OK" : "NOK"));
 		return mss;
 	}
@@ -71,47 +74,46 @@ final class Client extends Session implements IMessageHander {
 		/// Print cmd appear
 		System.out.println("Client #"+this.id+" mss="+mss);
 
+		// Phone number
+		String phoneNumber = null;
 		try {
 			/// Check phone number
 			Tag t = mss.getTag(Tag.TAG_PHONE_NUMBER);
 
-			// if can't find tag or phone number format error then response with error message
-			if (t != null && Pattern.matches(PHONE_NUMBER_REGEX, t.getValue())) {
+			// if found phone number tag then check it's format
+			if (t != null) {
+				if (!Pattern.matches(PHONE_NUMBER_REGEX, t.getValue())) {
+					// format error, send na result code and close handle
+					mss = new Message(Message.CMD_ERROR);
+					mss.addTag(new Tag(Tag.TAG_RESULT_CODE, "NA"));
+					super.sendMessage(mss);
+					return;
+				}
 				// get phone number
-				String phoneNumber = t.getValue();
+				phoneNumber = t.getValue();
+			}
 
-				/// process mss code
-				switch (mss.getCmd()) {
-					// cmd authen
-					case Message.CMD_AUTHEN:
-						// check if state is init
-						if (this.state != State.INIT) {
-							// if not return NOK
-							super.sendMessage(this.getResponseMessage(Message.CMD_AUTHEN, phoneNumber, false));
-							return;
-						}
+			/// process mss code
+			switch (mss.getCmd()) {
+				// cmd authen
+				case Message.CMD_AUTHEN:
+					// check if state is init
+					if (this.state == State.INIT
 						// get tag key
-						if ((t = mss.getTag(Tag.TAG_KEY)) != null) {
-							// check authen key
-							if(t.getValue().equals(KEY_AUTHEN)) {
-								// if tag is tag key and key is topica then return ok result and change state to init
-								this.state = State.READY;
-								super.sendMessage(this.getResponseMessage(Message.CMD_AUTHEN, phoneNumber, true));
-							} else
-								// if tag key isn't topica return nok
-								super.sendMessage(this.getResponseMessage(Message.CMD_AUTHEN, phoneNumber, false));
+						&& (t = mss.getTag(Tag.TAG_KEY)) != null
+						// check authen key
+						&& t.getValue().equals(KEY_AUTHEN)) {
+							// if tag is tag key and key is topica then return ok result and change state to init
+							this.state = State.READY;
+							super.sendMessage(this.getResponseMessage(Message.CMD_AUTHEN, phoneNumber, true));
 							return;
-						}
-						break;
-					// cmd insert and commit
-					case Message.CMD_INSERT:
-					case Message.CMD_COMMIT:
-						// check if state is ready
-						if (this.state != State.READY) {
-							// if not return NOK
-							super.sendMessage(this.getResponseMessage(mss.getCmd(), phoneNumber, false));
-							return;
-						}
+					}
+					break; // break to send nok result
+				// cmd insert and commit
+				case Message.CMD_INSERT:
+				case Message.CMD_COMMIT:
+					// check if state is ready
+					if (this.state == State.READY) {
 						// if commit then change state to select and return ok
 						if (mss.getCmd() == Message.CMD_COMMIT) {
 							this.state = State.SELECT;
@@ -126,30 +128,30 @@ final class Client extends Session implements IMessageHander {
 							super.sendMessage(this.getResponseMessage(Message.CMD_INSERT, phoneNumber, true));
 							return;
 						}
-						break;
-					// cmd select
-					case Message.CMD_SELECT:
-						// check if state is select
-						if (this.state != State.SELECT) {
-							// if not return NOK
-							super.sendMessage(this.getResponseMessage(mss.getCmd(), phoneNumber, false));
+					}
+					break; // break to send nok result
+				// cmd select
+				case Message.CMD_SELECT:
+					// check if state is select
+					if (this.state == State.SELECT) {
+						// check phone number
+						String user;
+						if (phoneNumber != null && (user = Server.gI().getNameByPhoneNumber(phoneNumber)) != null) {
+							// return ok result code and name slected
+							mss = this.getResponseMessage(Message.CMD_AUTHEN, phoneNumber, true);
+							mss.addTag(new Tag(Tag.TAG_NAME, user));
+							super.sendMessage(mss);
 							return;
 						}
-						// return ok result code and name slected
-						mss = this.getResponseMessage(Message.CMD_AUTHEN, phoneNumber, true);
-						mss.addTag(new Tag(Tag.TAG_NAME, Server.gI().getNameByPhoneNumber(phoneNumber)));
-						super.sendMessage(mss);
-						return;
-				}
+					}
+					break; // break to send nok result
 			}
 		} catch(Exception e) {
 			e.printStackTrace();
 		}
-		
-		// not recognize cmd then return NA result code
-		mss = new Message(Message.CMD_ERROR);
-		mss.addTag(new Tag(Tag.TAG_RESULT_CODE, "NA"));
-		super.sendMessage(mss);
+
+		// if command did not handle then return nok result
+		super.sendMessage(this.getResponseMessage(mss.getCmd(), phoneNumber, false));
 	}
 
 	@Override
@@ -159,6 +161,12 @@ final class Client extends Session implements IMessageHander {
 	@Override
 	public void onDisconnected() {
 		System.out.println("Client #"+id+" disconnected!");
+	}
+
+	@Override
+	public void sendMessage(Message mss) {
+		System.out.println(">>Send "+mss+" to client #"+this.id);
+		super.sendMessage(mss);
 	}
 
 }

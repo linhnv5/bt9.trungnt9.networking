@@ -194,7 +194,7 @@ public class Session implements ISession {
 	}
 
 	@Override
-	public final void sendMessage(Message mss) {
+	public void sendMessage(Message mss) {
 		// add message to queue and notify sender thread
 		this.listOfSendingMessage.add(mss);
 		synchronized (this.sendLockingObject) {
@@ -203,7 +203,7 @@ public class Session implements ISession {
 	}
 
 	@Override
-	public final void close() {
+	public void close() {
 		// set connected false to stop collector and sender
 		this.connecting = false;
 		this.connected = false;
